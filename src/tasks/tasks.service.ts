@@ -9,18 +9,18 @@ export class TasksService {
   }
 
   findAll() {
-    return `This action returns all tasks`;
+    return 'This action returns all tasks';
   }
 
-  findOne(id: number) {
+  findOne(id: string) {
     return `This action returns a #${id} task`;
   }
 
-  update(id: number, _updateTaskDto: UpdateTaskDto) {
+  update(id: string, _updateTaskDto: UpdateTaskDto) {
     return `This action updates a #${id} task`;
   }
 
-  remove(id: number) {
+  remove(id: string) {
     return `This action removes a #${id} task`;
   }
 }
