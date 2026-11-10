@@ -1,71 +1,42 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Task, TaskStatus, TaskPriority } from '@prisma/client';
+import { TasksRepository } from './tasks.repository';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
-import { randomUUID } from 'crypto';
-import { Task, TaskStatus, TaskPriority } from './entities/task.entity';
 
 @Injectable()
 export class TasksService {
-  private tasks: Map<string, Task> = new Map();
-  create(dto: CreateTaskDto): Task {
-    const id = randomUUID();
-    const now = new Date();
-    const task: Task = {
-      id,
-      title: dto.title,
-      description: dto.description,
-      status: TaskStatus.TODO,
-      priority: dto.priority ?? TaskPriority.MEDIUM,
-      dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.tasks.set(id, task);
-    return task;
+  constructor(private readonly tasksRepository: TasksRepository) {}
+
+  async create(dto: CreateTaskDto, clientTaskId?: string): Promise<Task> {
+    return this.tasksRepository.create(dto, clientTaskId);
   }
 
-  findAll(status?: string, priority?: string): Task[] {
-    let result = Array.from(this.tasks.values());
-
-    if (status) {
-      result = result.filter((task) => task.status === status);
-    }
-
-    if (priority) {
-      result = result.filter((task) => task.priority === priority);
-    }
-
-    return result;
+  async findAll(status?: string, priority?: string): Promise<Task[]> {
+    return this.tasksRepository.findAll(
+      status as TaskStatus | undefined,
+      priority as TaskPriority | undefined,
+    );
   }
 
-  findOne(id: string): Task {
-    const task = this.tasks.get(id);
-
+  async findOne(id: string): Promise<Task> {
+    const task = await this.tasksRepository.findById(id);
     if (!task) {
       throw new NotFoundException(`Task with ID "${id}" not found`);
     }
-
     return task;
   }
 
-  update(id: string, dto: UpdateTaskDto): Task {
-    const task = this.findOne(id);
-    if (dto.title !== undefined) task.title = dto.title;
-    if (dto.description !== undefined) task.description = dto.description;
-    if (dto.status !== undefined) task.status = TaskStatus.TODO;
-    if (dto.priority !== undefined) task.priority = dto.priority;
-    if (dto.dueDate !== undefined) {
-      task.dueDate = dto.dueDate ? new Date(dto.dueDate) : null;
-    }
-    task.updatedAt = new Date();
-    return task;
+  async update(id: string, dto: UpdateTaskDto): Promise<Task> {
+    // перевірка існування перед зміною
+    await this.findOne(id);
+    return this.tasksRepository.update(id, dto);
   }
 
-  remove(id: string): { success: boolean } {
-    this.findOne(id);
-
-    this.tasks.delete(id);
-
+  async remove(id: string): Promise<{ success: boolean }> {
+    // перевірка існування перед видаленням
+    await this.findOne(id);
+    await this.tasksRepository.delete(id);
     return { success: true };
   }
 }
