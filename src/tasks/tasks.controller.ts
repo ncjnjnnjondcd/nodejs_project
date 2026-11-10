@@ -6,6 +6,8 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
+  Headers,
   ParseUUIDPipe,
   ValidationPipe,
 } from '@nestjs/common';
@@ -18,13 +20,16 @@ export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
   @Post()
-  create(@Body(ValidationPipe) createTaskDto: CreateTaskDto) {
-    return this.tasksService.create(createTaskDto);
+  create(
+    @Body() createTaskDto: CreateTaskDto,
+    @Headers('x-idempotency-key') idempotencyKey?: string,
+  ) {
+    return this.tasksService.create(createTaskDto, idempotencyKey);
   }
 
   @Get()
-  findAll() {
-    return this.tasksService.findAll();
+  findAll(@Query('status') status?: string, @Query('priority') priority?: string) {
+    return this.tasksService.findAll(status, priority);
   }
 
   @Get(':id')

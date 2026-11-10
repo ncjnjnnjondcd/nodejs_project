@@ -1,5 +1,5 @@
 import { IsNotEmpty, IsOptional, IsString, IsEnum, IsDateString } from 'class-validator';
-import { TaskPriority } from '@prisma/client';
+import { TaskPriority } from '../entities/task.entity';
 
 export class CreateTaskDto {
   @IsNotEmpty({ message: 'Назва задачі є обов’язковою' })
