@@ -33,6 +33,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
         message = res;
         errorName = exception.name;
       }
+      this.logger.warn(
+        `HTTP ${status} (${request.method} ${request.url}): ${JSON.stringify(message)}`,
+      );
     } else if (exception instanceof Error) {
       this.logger.error(
         `[${processId}] Unhandled Exception: ${exception.message}`,
