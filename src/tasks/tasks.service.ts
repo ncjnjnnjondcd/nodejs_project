@@ -1,10 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { Task, TaskStatus, TaskPriority } from '@prisma/client';
 import { TasksRepository } from './tasks.repository';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { AppLogger } from '../common/logger/app.logger';
-
+import { isUUID } from 'class-validator';
 @Injectable()
 export class TasksService {
   private readonly logger = new AppLogger(TasksService.name);
@@ -13,6 +13,9 @@ export class TasksService {
 
   async create(dto: CreateTaskDto, clientTaskId?: string): Promise<Task> {
     this.logger.log(`Створення нового завдання: "${dto.title}"`);
+    if (clientTaskId !== undefined && !isUUID(clientTaskId)) {
+      throw new BadRequestException('Header "x-idempotency-key" must be a valid UUID');
+    }
     return this.tasksRepository.create(dto, clientTaskId);
   }
 
