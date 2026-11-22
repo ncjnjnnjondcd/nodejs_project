@@ -1,23 +1,23 @@
-import { Injectable, ConflictException, ServiceUnavailableException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { Prisma, Task, TaskStatus, TaskPriority } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
+import { AppLogger } from '../common/logger/app.logger';
 
 @Injectable()
 export class TasksRepository {
-  private readonly logger = new Logger(TasksRepository.name);
+  private readonly logger = new AppLogger(TasksRepository.name);
 
   constructor(private readonly prisma: PrismaService) {}
 
-  // cтворення завдання із захистом від дублювання
-
+  // створення завдання із захистом від дублювання
   async create(dto: CreateTaskDto, clientTaskId?: string): Promise<Task> {
     return this.executeWithRetry(async () => {
       try {
         return await this.prisma.task.create({
           data: {
-            id: clientTaskId, // якщо клієнт надав власний UUID для ідемпотентності
+            ...(clientTaskId ? { id: clientTaskId } : {}),
             title: dto.title,
             description: dto.description,
             status: TaskStatus.TODO,
@@ -26,10 +26,17 @@ export class TasksRepository {
           },
         });
       } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError) {
-          // id вже існує - ідемпотентний повтор запиту
-          if (error.code === 'P2002') {
-            throw new ConflictException(`Завдання з таким ID або назвою вже існує`);
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === 'P2002' &&
+          clientTaskId
+        ) {
+          // вже створене завдання замість 409 Conflict
+          const existingTask = await this.prisma.task.findUnique({
+            where: { id: clientTaskId },
+          });
+          if (existingTask) {
+            return existingTask;
           }
         }
         throw error;
@@ -57,30 +64,38 @@ export class TasksRepository {
     });
   }
 
-  // oновлення в межах ізольованої операції бд
-
   async update(id: string, dto: UpdateTaskDto): Promise<Task> {
     return this.executeWithRetry(async () => {
-      return this.prisma.task.update({
-        where: { id },
-        data: {
-          ...(dto.title !== undefined ? { title: dto.title } : {}),
-          ...(dto.description !== undefined ? { description: dto.description } : {}),
-          ...(dto.status !== undefined ? { status: dto.status as TaskStatus } : {}),
-          ...(dto.priority !== undefined ? { priority: dto.priority as TaskPriority } : {}),
-          ...(dto.dueDate !== undefined
-            ? { dueDate: dto.dueDate ? new Date(dto.dueDate) : null }
-            : {}),
-        },
+      return this.prisma.$transaction(async (tx) => {
+        const existing = await tx.task.findUnique({ where: { id } });
+        if (!existing) {
+          throw new NotFoundException(`Task with ID "${id}" not found`);
+        }
+
+        return tx.task.update({
+          where: { id },
+          data: {
+            ...(dto.title !== undefined ? { title: dto.title } : {}),
+            ...(dto.description !== undefined ? { description: dto.description } : {}),
+            ...(dto.status !== undefined ? { status: dto.status as TaskStatus } : {}),
+            ...(dto.priority !== undefined ? { priority: dto.priority as TaskPriority } : {}),
+            ...(dto.dueDate !== undefined
+              ? { dueDate: dto.dueDate ? new Date(dto.dueDate) : null }
+              : {}),
+          },
+        });
       });
     });
   }
 
-  //атомарне видалення в транзакції
   async delete(id: string): Promise<void> {
     await this.executeWithRetry(async () => {
-      // Prisma $transaction гарантує атомарність операцій у сховищі
       await this.prisma.$transaction(async (tx) => {
+        const existing = await tx.task.findUnique({ where: { id } });
+        if (!existing) {
+          throw new NotFoundException(`Task with ID "${id}" not found`);
+        }
+
         await tx.task.delete({
           where: { id },
         });
@@ -88,8 +103,7 @@ export class TasksRepository {
     });
   }
 
-  // механізм повторних спроб при тимчасових збоях
-
+  //  повторні спроби при тимчасових збоях
   private async executeWithRetry<T>(
     operation: () => Promise<T>,
     attempts = 3,

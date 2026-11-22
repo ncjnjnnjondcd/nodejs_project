@@ -40,14 +40,12 @@ export class TasksService {
   async update(id: string, dto: UpdateTaskDto): Promise<Task> {
     // перевірка існування перед зміною
     this.logger.log(`Оновлення завдання id=${id}`);
-    await this.findOne(id);
     return this.tasksRepository.update(id, dto);
   }
 
   async remove(id: string): Promise<{ success: boolean }> {
     // перевірка існування перед видаленням
     this.logger.log(`Видалення завдання id=${id}`);
-    await this.findOne(id);
     await this.tasksRepository.delete(id);
     return { success: true };
   }
