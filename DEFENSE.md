@@ -1,30 +1,23 @@
-# DEFENSE Завдання 1: Фундамент і структура застосунку
+зроблено unit, інтеграційні( БД, HTTP-сервер), E2E тести
+unit:
+commit 260eadb152f698df8ca41cb1b81c1ac3861b6691
 
-**1. Намір і критерії:** Реалізувати бекенд менеджера завдань на базі NestJS, SQLite (Prisma) та Vanilla JS без сторонніх фронтенд-фреймворків із забезпеченням строгої типізації, валідації вхідних даних та автоматизованого контролю якості через Git-хуки. Специфікація: `spec.md`.
+integration tests and e2e:
+commit b5ff68059d58c114f6ccd2a464f1894d5297f3fb
 
-| № | Виявлена розбіжність | Опис дефекту | Коміт-виправлення (SHA) |
-|:--|:---------------------|:-------------|:------------------------|
-| 1 | Реєстрація модуля БД | У `spec.md` написано підключення `PrismaModule`, проте в `AppModule.imports` він був відсутній. | `2351e78` (`register PrismaModule in AppModule imports to match spec`) |
-| 2 | Порожні класи DTO | Специфікація вимагає валідацію вхідних даних через `class-validator`, проте файли `CreateTaskDto` та `UpdateTaskDto` були порожніми класами без правил валідації. | `35ec809` (`implement class-validator rules in CreateTaskDto and UpdateTaskDto`) |
-| 3 | Неправильні залежності та маршрутизація | Маршрут було оголошено як `tasks` замість `/api/tasks`. У контролері оператор `+id` зводив строковий UUID моделі Prisma до числа (`number`). Виправлено заміною на `ParseUUIDPipe` та строковий тип `id: string`. | `5092307` (`route to /api/tasks and replace invalid unary +id with ParseUUIDPipe`) |
+виявлено 5 прийнятливих виживших мутантів за допомогою Stryker, заміна строки зі значенням на пусту `StringLiteral Survived` в src/tasks.service.ts
 
-**3. Ключове рішення:** Вибір NestJS + SQLite (Prisma ORM) + чистий JS замість frontend фреймворків і зовнішніх СУБД.
+Аудит: Топ-3 місця, де «зелені» тести не ловлять реальні баги
+1. створення задачі з існуючим ключем, тести перевіряли лише відхилення невалідного ключа та перше створення.
+при закоменованому блоці перехоплення P2002, тести проходили перевірку
+2. перевірка існування запису при PATCH та DELETE неіснуючого uuid, тести перевіряли на існучій задачі
+3. E2E-тест перевіряв лише статус-код не перевіряючи чи не записалось шось в бд і чи повертає обробник помилок x-process-id
 
-## 2. Перевірка блокування брудного» коміту через Git Hook
+виправлено в:
+commit 87d587bdc7b423ac312e63d4ee46bd2f2650f06a
 
-### Команда перевірки:
-Спроба закомітити некоректний код із порушенням правил типізації TypeScript:
+Оцінка тестів:
+кількісь мутантів 25, 20 вбитих, 5 виживших(прийнятливі)
+для відтворення: npm run mutation
 
-додав "const dirtyTestVariable: number = 'this is a dirty string';" в src/tasks/tasks.service.ts
-git add src/tasks/tasks.service.ts
-git commit -m "verify dirty commit rejection"
-
-> app_project@0.0.1 typecheck
-> tsc --noEmit
-
-src/tasks/tasks.service.ts:28:7 - error TS2322: Type 'string' is not assignable to type 'number'.
-
-28 const dirtyTestVariable: number = 'this is a dirty string';
-         ~~~~~~~~~~~~~~~~~
-
-Found 1 error in src/tasks/tasks.service.ts:28
+для відтворення всіх тестів: npm run test:all
