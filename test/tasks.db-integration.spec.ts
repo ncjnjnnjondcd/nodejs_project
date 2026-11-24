@@ -63,4 +63,28 @@ describe('TasksService (Integration with SQLite)', () => {
     const tasks = await service.findAll();
     expect(tasks).toHaveLength(0);
   });
+
+  it('має повертати ту саму задачу при повторному create з однаковим Id', async () => {
+    const fixedUuid = '550e8400-e29b-41d4-a716-446655440099';
+
+    const first = await service.create({ title: 'Ідемпотентна задача' }, fixedUuid);
+    const second = await service.create({ title: 'Ідемпотентна задача' }, fixedUuid);
+
+    expect(second.id).toBe(first.id);
+    expect(await prisma.task.count({ where: { id: fixedUuid } })).toBe(1);
+  });
+
+  it('має бути NotFoundException при спробі оновити неіснуючу задачу', async () => {
+    const nonExistentId = '550e8400-e29b-41d4-a716-446655440999';
+
+    await expect(service.update(nonExistentId, { status: 'DONE' })).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+
+  it('має бути NotFoundException при спробі видалити неіснуючу задачу', async () => {
+    const nonExistentId = '550e8400-e29b-41d4-a716-446655440999';
+
+    await expect(service.remove(nonExistentId)).rejects.toThrow(NotFoundException);
+  });
 });

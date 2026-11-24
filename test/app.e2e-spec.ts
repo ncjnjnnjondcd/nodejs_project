@@ -87,4 +87,20 @@ describe('Tasks E2E', () => {
     const count = await prisma.task.count();
     expect(count).toBe(0);
   });
+
+  it('має повертати 400 при невалідному тілі, не створювати запис у бд, повертати переданий x-process-id', async () => {
+    const countBefore = await prisma.task.count();
+    const customProcessId = '11111111-2222-4333-8444-555555555555';
+
+    const res = await request(app.getHttpServer())
+      .post('/api/tasks')
+      .set('x-process-id', customProcessId)
+      .send({ title: '', priority: 'INVALID_PRIORITY' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.processId).toBe(customProcessId);
+
+    const countAfter = await prisma.task.count();
+    expect(countAfter).toBe(countBefore);
+  });
 });
