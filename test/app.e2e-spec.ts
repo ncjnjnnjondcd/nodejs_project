@@ -3,6 +3,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma.service';
+import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
 
 describe('Tasks E2E', () => {
   let app: INestApplication;
@@ -12,6 +13,16 @@ describe('Tasks E2E', () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
+    app = moduleFixture.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
+    app.useGlobalFilters(new AllExceptionsFilter());
+    await app.init();
 
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(
